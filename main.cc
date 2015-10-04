@@ -2,6 +2,7 @@
 #include <chrono>
 #include <sstream>
 #include <iostream>
+#include "bitfield.hh"
 
 
 using namespace sio::ops;
@@ -14,7 +15,7 @@ using stclk = std::chrono::steady_clock;
     sio::string_writer sw(str);
 
     for (std::size_t i = 0; i < 1000000; ++i) {
-        sw << sio::format(i, sio::format_flags::hex | sio::format_flags::show_base) << " ";
+        sw << sio::format(i, sio::fmt::hex | sio::fmt::show_base) << " ";
     }
     sw << sio::nl << sio::flush;
     //std::cout << str;
@@ -35,6 +36,8 @@ void foo(const std::string &s) {
     std::cout << s << "\n";
 }
 
+enum class flgs { foo, bar };
+
 
 int main(void) {
     auto now = stclk::now();
@@ -47,6 +50,6 @@ int main(void) {
     std::cout << std::chrono::duration_cast<std::chrono::microseconds>(stclk::now() - now).count() << "\n";
 
 
-    foo(std::string{} << 123 << " + " << sio::format(3.14159265, sio::format_flags::show_sign)
+    foo(std::string{} << 123 << " + " << sio::format(3.14159265, sio::fmt::show_sign)
             << sio::ret);
 }

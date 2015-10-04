@@ -4,6 +4,7 @@
 #include <utility>
 #include <memory>
 #include <string>
+#include "bitfield.hh"
 
 
 namespace std {
@@ -45,25 +46,19 @@ constexpr auto make_formatter(Implementation &&impl)
 };
 
 
-
-struct format_flags {
-    enum value_type {
-        oct = 2, hex = 8,
-        sci = 16, fixed = 32, show_base = 64, show_point = 128, show_sign = 256,
-        uppercase = 512
-    } value;
-
-    constexpr format_flags(): value(value_type(0)) {}
-
-    constexpr format_flags(value_type v): value(v) {}
-
-    constexpr format_flags(int v): value(value_type(v)) {}
-
-    constexpr operator value_type() const noexcept {
-        return value;
-    }
+enum class fmt {
+    oct         = 1 << 0,
+    hex         = 1 << 1,
+    sci         = 1 << 2,
+    fixed       = 1 << 3,
+    show_base   = 1 << 4,
+    show_point  = 1 << 5,
+    show_sign   = 1 << 6,
+    uppercase   = 1 << 7
 };
 
+template<>
+struct is_bit_enum<fmt>: public std::true_type {};
 
 
 enum class line_ending {
@@ -283,13 +278,13 @@ write(Writeable &w, const char (&literal)[N]) {
 template<typename Number, std::enable_if_t<std::is_arithmetic<Number>{}
         || std::is_same<Number, bool>{} || std::is_same<Number, const void*>{}, int> = 0>
 void
-write(writeable &w, const Number &v, format_flags flags = format_flags{}, unsigned precision = 6);
+write(writeable &w, const Number &v, bitfield<fmt> flags = {}, unsigned precision = 6);
 
 
 template<typename Number, std::enable_if_t<std::is_arithmetic<Number>{}
         || std::is_same<Number, bool>{} || std::is_same<Number, const void*>{}, int> = 0>
 auto
-format(const Number &v, format_flags flags, unsigned precision = 6) {
+format(const Number &v, bitfield<fmt> flags, unsigned precision = 6) {
     return make_formatter([=](auto &w) {
         write(w, v, flags, precision);
     });

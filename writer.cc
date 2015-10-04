@@ -92,30 +92,30 @@ static auto widen_integer(const Number &num) {
 template<typename Number, std::enable_if_t<std::is_arithmetic<Number>{}
         || std::is_same<Number, bool>{} || std::is_same<Number, const void*>{}, int>>
 void
-sio::write(writeable &w, const Number &v, format_flags flags, unsigned precision) {
+sio::write(writeable &w, const Number &v, bitfield<fmt> flags, unsigned precision) {
     std::ios_base::fmtflags iosflags {};
-    if (flags & format_flags::oct) {
+    if (flags & fmt::oct) {
         iosflags |= std::ios_base::oct;
-    } else if (flags & format_flags::hex) {
+    } else if (flags & fmt::hex) {
         iosflags |= std::ios_base::hex;
     } else {
         iosflags |= std::ios_base::dec;
     }
-    if (flags & format_flags::sci) {
+    if (flags & fmt::sci) {
         iosflags |= std::ios_base::scientific;
-    } else if (flags & format_flags::fixed) {
+    } else if (flags & fmt::fixed) {
         iosflags |= std::ios_base::fixed;
     }
-    if (flags & format_flags::show_base) {
+    if (flags & fmt::show_base) {
         iosflags |= std::ios_base::showbase;
     }
-    if (flags & format_flags::show_point) {
+    if (flags & fmt::show_point) {
         iosflags |= std::ios_base::showpoint;
     }
-    if (flags & format_flags::show_sign) {
+    if (flags & fmt::show_sign) {
         iosflags |= std::ios_base::showpos;
     }
-    if (flags & format_flags::uppercase) {
+    if (flags & fmt::uppercase) {
         iosflags |= std::ios_base::uppercase;
     }
 
@@ -133,19 +133,19 @@ sio::write(writeable &w, const Number &v, format_flags flags, unsigned precision
     w.write(raw, buf.pos());
 }
 
-template void sio::write(writeable &, const char &, format_flags, unsigned);
-template void sio::write(writeable &, const unsigned char &, format_flags, unsigned);
-template void sio::write(writeable &, const signed char &, format_flags, unsigned);
-template void sio::write(writeable &, const unsigned short &, format_flags, unsigned);
-template void sio::write(writeable &, const short &, format_flags, unsigned);
-template void sio::write(writeable &, const unsigned int &, format_flags, unsigned);
-template void sio::write(writeable &, const int &, format_flags, unsigned);
-template void sio::write(writeable &, const unsigned long &, format_flags, unsigned);
-template void sio::write(writeable &, const long &, format_flags, unsigned);
-template void sio::write(writeable &, const unsigned long long &, format_flags, unsigned);
-template void sio::write(writeable &, const long long &, format_flags, unsigned);
-template void sio::write(writeable &, const float &, format_flags, unsigned);
-template void sio::write(writeable &, const double &, format_flags, unsigned);
-template void sio::write(writeable &, const long double &, format_flags, unsigned);
-template void sio::write(writeable &, const void *const &, format_flags, unsigned);
-template void sio::write(writeable &, const bool &, format_flags, unsigned);
+template void sio::write(writeable &, const char &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const unsigned char &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const signed char &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const unsigned short &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const short &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const unsigned int &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const int &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const unsigned long &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const long &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const unsigned long long &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const long long &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const float &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const double &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const long double &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const void *const &, bitfield<fmt>, unsigned);
+template void sio::write(writeable &, const bool &, bitfield<fmt>, unsigned);
