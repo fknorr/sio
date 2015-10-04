@@ -90,6 +90,15 @@ enum class line_ending {
     crlf
 };
 
+template<>
+struct enum_names<line_ending> {
+    enum_name_list<line_ending> operator()() const {
+        return { "sio::line_ending::", {
+            { line_ending::cr, "cr" }, { line_ending::lf, "lf" }, { line_ending::crlf, "crlf" }
+        } };
+    }
+};
+
 
 class writeable {
 public:
