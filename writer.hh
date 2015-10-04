@@ -2,9 +2,28 @@
 
 #include <type_traits>
 #include <utility>
-#include <string>
 #include <memory>
-#include <locale>
+
+
+namespace std {
+    template<typename Char, typename Traits>
+    class basic_streambuf;
+
+    class ios_base;
+    class locale;
+
+    template<typename Char, typename OutputIt>
+    class num_put;
+
+    template<typename Char, typename Traits>
+    class ostreambuf_iterator;
+
+    template<typename Char>
+    struct char_traits;
+}
+
+
+namespace fio {
 
 
 class formatter {};
@@ -37,9 +56,14 @@ public:
     class ios_cache {
     private:
         struct ref_set {
+            using streambuf_type = std::basic_streambuf<char, std::char_traits<char>>;
+            using num_put_type = std::num_put<char, std::ostreambuf_iterator<char,
+                    std::char_traits<char>>>;
+
             std::unique_ptr<std::ios_base> ios_base;
+            std::unique_ptr<streambuf_type> streambuf;
             const std::locale *locale;
-            const std::num_put<char> *num_put;
+            const num_put_type *num_put;
         };
         std::unique_ptr<ref_set> m_refs;
 
@@ -60,6 +84,7 @@ public:
         }
 
         static std::unique_ptr<std::ios_base> create_ios_base();
+        static std::unique_ptr<std::streambuf> create_streambuf();
 
         template<typename Facet>
         static const Facet &cached_facet(Facet *&ptr, const std::locale &locale);
@@ -75,51 +100,49 @@ public:
             }
             return *r.ios_base;
         }
+
+        std::streambuf &streambuf() {
+            auto &r = refs();
+            if (!r.streambuf) {
+                r.streambuf = create_streambuf();
+            }
+            return *r.streambuf;
+        }
     };
 
     ios_cache &ios() const {
         return m_ios;
     }
 
-    writer() {}
-    writer(const writer &) {}
+    writer() noexcept {}
+    writer(const writer &) noexcept {}
     writer(writer &&rhs) = default;
 
     writer &operator=(const writer&) = delete;
     writer &operator=(writer &&) = default;
 
-    const std::locale &locale() const {
-        return std::locale::classic();
-    }
+    const std::locale &locale() const;
 
-    void flush() {}
+    fio::line_ending line_ending() const noexcept {
+        return line_ending::lf;
+    }
 
 private:
     mutable ios_cache m_ios;
 };
 
 
-template<typename Facet>
-const Facet &
-writer::ios_cache::cached_facet(Facet *&ptr, const std::locale &locale) {
-    if (!ptr) {
-        ptr = &std::use_facet<Facet>(locale);
-    }
-    return *ptr;
-}
-
-
-template<>
-inline const std::num_put<char> &
-writer::ios_cache::locale_facet<std::num_put<char>>(const std::locale &locale) {
-    auto &r = refs(locale);
-    return cached_facet(r.num_put, *r.locale);
-}
-
-
-
 template<typename T>
 using is_writer = std::is_base_of<writer, std::decay_t<T>>;
+
+
+class buffered {};
+
+template<typename T>
+using is_buffered = std::is_base_of<buffered, std::decay_t<T>>;
+
+template<typename T>
+using is_buffered_writer = std::integral_constant<bool, is_writer<T>{} && is_buffered<T>{}>;
 
 
 class writer_mod {};
@@ -147,7 +170,7 @@ auto operator<<(Writer &w, const WriterMod &mod) {
 
 template<typename WriterMod, typename Next,
         std::enable_if_t<is_free_writer_mod<WriterMod>{}, int> = 0>
-auto operator<<(const WriterMod &w, const Next &next) {
+decltype(auto) operator<<(const WriterMod &w, const Next &next) {
     write(w, next);
     return w.base();
 }
@@ -155,7 +178,7 @@ auto operator<<(const WriterMod &w, const Next &next) {
 
 template<typename Writer, typename Next,
         std::enable_if_t<is_writer<Writer>{} && !is_free_writer_mod<Writer>{}, int> = 0>
-auto operator<<(Writer &&w, const Next &next) {
+decltype(auto) operator<<(Writer &&w, const Next &next) {
     write(w, next);
     return std::forward<Writer>(w);
 }
@@ -182,63 +205,49 @@ auto begin(WriterMod &&mod) {
 
 class end_t {} extern end;
 
-
 template<typename WriterModHook, std::enable_if_t<is_writer_mod_hook<WriterModHook>{}, int> = 0>
-auto operator<<(WriterModHook &&w, end_t) {
+decltype(auto) operator<<(WriterModHook &&w, end_t) {
     return w.parent();
 }
 
 
 class nl_t {} extern nl;
 
-
 template<typename Writer>
-auto write(Writer &w, nl_t) {
-    /*switch (writer.line_ending()) {
-        case line_ending::cr: writer.write("\r", 1); break;
-        case line_ending::lf: */w.write("\n", 1);/* break;
-        case line_ending::crlf: writer.write("\r\n", 2); break;
-    }*/
+void write(Writer &w, nl_t) {
+    switch (w.line_ending()) {
+        case line_ending::cr: write(w, "\r"); break;
+        case line_ending::lf: write(w, "\n"); break;
+        case line_ending::crlf: write(w, "\r\n"); break;
+    }
 }
 
 
-class string_writer: public writer {
-public:
-    string_writer(std::string &str)
-        : m_string(&str) {
-    }
+class flush_t {} extern flush;
 
-    void write(const char *seq, std::size_t n) {
-        if (spos + n > sz) {
-            flush();
-        }
-        if (n > sz) {
-            m_string->append(seq, seq+n);
-        } else {
-            std::copy(seq, seq+n, scratch);
-            spos = n;
-        }
-    }
+template<typename BufferedWriter,
+        std::enable_if_t<is_buffered_writer<BufferedWriter>{}, int> = 0>
+void write(BufferedWriter &w, flush_t) {
+    w.flush();
+}
 
-    void flush() {
-        if (spos) {
-            m_string->append(scratch, scratch+spos);
-            spos = 0;
-        }
-    }
 
-private:
-    static constexpr std::size_t sz = 100;
-    std::string *m_string;
-    char scratch[sz];
-    std::size_t spos = 0;
-};
+
+template<typename Writer, std::size_t N>
+void write(Writer &w, const char (&literal)[N]) {
+    w.write(literal, N-1);
+}
+
+
+template<typename Writer>
+auto write(Writer &w, const std::string &str) {
+    w.write(str.c_str(), str.length());
+}
+
 
 
 template<typename Writer>
 void write(Writer &w, int v);
 
-template<typename T>
-auto operator<<(std::string &str, T &&chain) {
-    return string_writer(str) << std::forward<T>(chain);
-}
+
+} // namespace fio

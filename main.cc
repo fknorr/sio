@@ -1,8 +1,7 @@
-#include "writer.hh"
+#include "string.hh"
 #include <chrono>
 #include <sstream>
 #include <iostream>
-
 
 
 using stclk = std::chrono::steady_clock;
@@ -10,19 +9,23 @@ using stclk = std::chrono::steady_clock;
 
 [[gnu::noinline]] void first() {
     std::string str;
-    string_writer sw(str);
+    fio::string_writer sw(str);
 
     for (std::size_t i = 0; i < 1000000; ++i) {
-        sw << 123 << nl;
+        sw << int(i) << " ";
     }
+    sw << fio::nl;
+    sw.flush();
+    //std::cout << str;
 }
 
 [[gnu::noinline]] void second() {
     std::ostringstream oss;
     for (std::size_t i = 0; i < 1000000; ++i) {
-        oss << 123 << "\n";
+        oss << int(i) << " ";
     }
-    oss.str();
+    oss << "\n";
+    //std::cout << oss.str();
 }
 
 
