@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <utility>
 #include <memory>
+#include <string>
 
 
 namespace std {
@@ -124,7 +125,7 @@ public:
     const std::locale &locale() const;
 
     fio::line_ending line_ending() const noexcept {
-        return line_ending::lf;
+        return fio::line_ending::lf;
     }
 
 private:
@@ -240,14 +241,60 @@ void write(Writer &w, const char (&literal)[N]) {
 
 
 template<typename Writer>
-auto write(Writer &w, const std::string &str) {
+void write(Writer &w, int v);
+
+
+class string_writer: public writer {
+public:
+    string_writer(std::string &str)
+        : m_string(&str) {
+    }
+
+    ~string_writer() noexcept {
+        try { flush(); } catch(...) {}
+    }
+
+    void write(const char *seq, std::size_t n) {
+        if (spos + n > sz) {
+            flush();
+        }
+        if (n > sz) {
+            m_string->append(seq, seq+n);
+        } else {
+            std::copy(seq, seq+n, scratch+spos);
+            spos += n;
+        }
+    }
+
+    void flush() {
+        if (spos) {
+            m_string->append(scratch, scratch+spos);
+            spos = 0;
+        }
+    }
+
+private:
+    static constexpr std::size_t sz = 100;
+    std::string *m_string;
+    char scratch[sz];
+    std::size_t spos = 0;
+};
+
+
+template<typename Writer>
+void write(Writer &w, const std::string &str) {
     w.write(str.c_str(), str.length());
 }
 
 
+namespace ops {
 
-template<typename Writer>
-void write(Writer &w, int v);
+template<typename T>
+auto operator<<(std::string &str, T &&chain) {
+    return string_writer(str) << std::forward<T>(chain);
+}
+
+} // namespace ops
 
 
 } // namespace fio

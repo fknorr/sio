@@ -1,5 +1,4 @@
 #include "writer.hh"
-#include "string.hh"
 #include <locale>
 #include <streambuf>
 
@@ -48,6 +47,8 @@ writer::ios_cache::cached_facet(Facet *&ptr, const std::locale &locale) {
 }
 
 
+namespace fio {
+
 template<>
 inline const std::num_put<char> &
 writer::ios_cache::locale_facet<std::num_put<char>>(const std::locale &locale) {
@@ -58,6 +59,8 @@ writer::ios_cache::locale_facet<std::num_put<char>>(const std::locale &locale) {
 
 template const std::num_put<char> &
 writer::ios_cache::locale_facet<std::num_put<char>>(const std::locale &);
+
+} // namespace fio
 
 
 const std::locale &
