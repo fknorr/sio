@@ -1,6 +1,8 @@
 #pragma once
 
 #include <type_traits>
+#include <limits>
+#include <utility>
 
 
 namespace sio {
@@ -68,6 +70,24 @@ public:
         return bits != rhs.bits;
     }
 };
+
+
+template<typename Writer, typename Enum>
+void
+write(Writer &&w, bitfield<Enum> field) {
+    bool first = true;
+    for (int i = std::numeric_limits<typename bitfield<Enum>::integer>::digits-1; i >= 0; --i) {
+        Enum bit = static_cast<Enum>(1 << i);
+        if (field & bit) {
+            if (!first) {
+                write(std::forward<Writer>(w), " | ");
+            } else {
+                first = false;
+            }
+            write(std::forward<Writer>(w), bit);
+        }
+    }
+}
 
 
 } // namespace sio

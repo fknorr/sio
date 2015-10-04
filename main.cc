@@ -52,4 +52,6 @@ int main(void) {
 
     foo(std::string{} << 123 << " + " << sio::format(3.14159265, sio::fmt::show_sign)
             << sio::ret);
+
+    foo(std::string{} << (sio::fmt::oct | sio::fmt::fixed | sio::bitfield<sio::fmt>(2048)) << sio::ret);
 }

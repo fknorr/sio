@@ -4,6 +4,7 @@
 #include <utility>
 #include <memory>
 #include <string>
+#include <initializer_list>
 #include "bitfield.hh"
 
 
@@ -46,6 +47,13 @@ constexpr auto make_formatter(Implementation &&impl)
 };
 
 
+template<typename Enum>
+using enum_name_list = std::pair<const char*, std::initializer_list<std::pair<Enum, const char*>>>;
+
+template<typename Enum>
+struct enum_names;
+
+
 enum class fmt {
     oct         = 1 << 0,
     hex         = 1 << 1,
@@ -59,6 +67,17 @@ enum class fmt {
 
 template<>
 struct is_bit_enum<fmt>: public std::true_type {};
+
+template<>
+struct enum_names<fmt> {
+    enum_name_list<fmt> operator()() const {
+        return { "sio::fmt::", {
+            { fmt::oct, "oct" }, { fmt::hex, "hex" }, { fmt::sci, "sci" }, { fmt::fixed, "fixed" },
+            { fmt::show_base, "show_base" }, { fmt::show_point, "show_point" },
+            { fmt::show_sign, "show_sign" }, { fmt::uppercase, "uppercase" }
+        } };
+    }
+};
 
 
 enum class line_ending {
@@ -359,6 +378,30 @@ template<typename Writeable, std::enable_if_t<
 auto
 operator<<(Writeable &&w, ret_t) {
     return std::forward<typename Writeable::ref_type>(w.string());
+}
+
+
+template<typename Writer, typename Enum,
+         std::enable_if_t<std::is_enum<Enum>{}, int> = 0>
+void
+write(Writer &&w, Enum value) {
+    auto map = enum_names<Enum>{}();
+    write(std::forward<Writer>(w), map.first);
+
+    const char *name = nullptr;
+    for (auto &pair : map.second) {
+        if (pair.first == value) {
+            name = pair.second;
+            break;
+        }
+    }
+    if (name) {
+        write(std::forward<Writer>(w), name);
+    } else {
+        write(std::forward<Writer>(w), "<");
+        write(std::forward<Writer>(w), static_cast<std::underlying_type_t<Enum>>(value));
+        write(std::forward<Writer>(w), ">");
+    }
 }
 
 
