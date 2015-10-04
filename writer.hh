@@ -333,7 +333,8 @@ public:
         }
     }
 
-    Ref string() const {
+    Ref string() {
+        flush();
         return std::forward<Ref>(*m_string);
     }
 

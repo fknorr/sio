@@ -47,5 +47,6 @@ int main(void) {
     std::cout << std::chrono::duration_cast<std::chrono::microseconds>(stclk::now() - now).count() << "\n";
 
 
-    foo(std::string{} << 123 << sio::ret);
+    foo(std::string{} << 123 << " + " << sio::format(3.14159265, sio::format_flags::show_sign)
+            << sio::ret);
 }
