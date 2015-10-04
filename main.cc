@@ -54,4 +54,6 @@ int main(void) {
             << sio::ret);
 
     foo(std::string{} << (sio::fmt::oct | sio::fmt::fixed | sio::bitfield<sio::fmt>(2048)) << sio::ret);
+
+    foo(std::string{} << sio::line_ending::cr << sio::ret);
 }
