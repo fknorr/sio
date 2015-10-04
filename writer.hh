@@ -24,7 +24,7 @@ namespace std {
 }
 
 
-namespace fio {
+namespace sio {
 
 
 class formatter {};
@@ -45,6 +45,27 @@ constexpr auto make_formatter(Implementation &&impl)
 };
 
 
+
+struct format_flags {
+    enum value_type {
+        oct = 2, hex = 8,
+        sci = 16, fixed = 32, show_base = 64, show_point = 128, show_sign = 256,
+        uppercase = 512
+    } value;
+
+    constexpr format_flags(): value(value_type(0)) {}
+
+    constexpr format_flags(value_type v): value(v) {}
+
+    constexpr format_flags(int v): value(value_type(v)) {}
+
+    constexpr operator value_type() const noexcept {
+        return value;
+    }
+};
+
+
+
 enum class line_ending {
     cr,
     lf,
@@ -52,7 +73,7 @@ enum class line_ending {
 };
 
 
-class writer {
+class writeable {
 public:
     class ios_cache {
     private:
@@ -111,22 +132,32 @@ public:
         }
     };
 
-    ios_cache &ios() const {
+    virtual ~writeable() {}
+
+    virtual ios_cache &ios() const = 0;
+
+    virtual const std::locale &locale() const;
+
+    virtual sio::line_ending line_ending() const noexcept {
+        return sio::line_ending::lf;
+    }
+
+    virtual void write(const char *seq, std::size_t n) = 0;
+};
+
+
+class writer: public writeable {
+public:
+    virtual ios_cache &ios() const override {
         return m_ios;
     }
 
     writer() noexcept {}
-    writer(const writer &) noexcept {}
+    writer(const writer &) = delete;
     writer(writer &&rhs) = default;
 
     writer &operator=(const writer&) = delete;
     writer &operator=(writer &&) = default;
-
-    const std::locale &locale() const;
-
-    fio::line_ending line_ending() const noexcept {
-        return fio::line_ending::lf;
-    }
 
 private:
     mutable ios_cache m_ios;
@@ -134,7 +165,7 @@ private:
 
 
 template<typename T>
-using is_writer = std::is_base_of<writer, std::decay_t<T>>;
+using is_writeable = std::is_base_of<writeable, std::decay_t<T>>;
 
 
 class buffered {};
@@ -143,79 +174,86 @@ template<typename T>
 using is_buffered = std::is_base_of<buffered, std::decay_t<T>>;
 
 template<typename T>
-using is_buffered_writer = std::integral_constant<bool, is_writer<T>{} && is_buffered<T>{}>;
+using is_buffered_writeable = std::integral_constant<bool, is_writeable<T>{} && is_buffered<T>{}>;
 
 
-class writer_mod {};
-
-template<typename T>
-using is_writer_mod = std::is_base_of<writer_mod, std::decay_t<T>>;
-
-class writer_mod_hook {};
+class format_mod {};
 
 template<typename T>
-using is_writer_mod_hook = std::is_base_of<writer_mod_hook, std::decay_t<T>>;
+using is_format_mod = std::is_base_of<format_mod, std::decay_t<T>>;
+
+class format_mod_hook {};
 
 template<typename T>
-using is_free_writer_mod = std::integral_constant<bool,
-        is_writer_mod<std::decay_t<T>>{} && !is_writer_mod_hook<std::decay_t<T>>{}>;
+using is_format_mod_hook = std::is_base_of<format_mod_hook, std::decay_t<T>>;
+
+template<typename T>
+using is_free_format_mod = std::integral_constant<bool,
+        is_format_mod<std::decay_t<T>>{} && !is_format_mod_hook<std::decay_t<T>>{}>;
 
 
 
-template<typename Writer, typename WriterMod,
-        std::enable_if_t<is_writer<Writer>{} && is_writer_mod<WriterMod>{}, int> = 0>
-auto operator<<(Writer &w, const WriterMod &mod) {
+template<typename Writeable, typename FormatMod,
+        std::enable_if_t<is_writeable<Writeable>{} && is_format_mod<FormatMod>{}, int> = 0>
+auto
+operator<<(Writeable &w, const FormatMod &mod) {
     return mod.bind(w);
 }
 
 
-template<typename WriterMod, typename Next,
-        std::enable_if_t<is_free_writer_mod<WriterMod>{}, int> = 0>
-decltype(auto) operator<<(const WriterMod &w, const Next &next) {
+template<typename FormatMod, typename Next,
+        std::enable_if_t<is_free_format_mod<FormatMod>{}, int> = 0>
+decltype(auto)
+operator<<(const FormatMod &w, const Next &next) {
     write(w, next);
     return w.base();
 }
 
 
-template<typename Writer, typename Next,
-        std::enable_if_t<is_writer<Writer>{} && !is_free_writer_mod<Writer>{}, int> = 0>
-decltype(auto) operator<<(Writer &&w, const Next &next) {
+template<typename Writeable, typename Next,
+        std::enable_if_t<is_writeable<Writeable>{} && !is_free_format_mod<Writeable>{}, int> = 0>
+decltype(auto)
+operator<<(Writeable &&w, const Next &next) {
     write(w, next);
-    return std::forward<Writer>(w);
+    return std::forward<Writeable>(w);
 }
 
 
-template<typename Writer, typename Formatter,
+template<typename Writeable, typename Formatter,
         std::enable_if_t<is_formatter<Formatter>{}, int> = 0>
-void write(Writer &w, const Formatter &fmt) {
+void
+write(Writeable &w, const Formatter &fmt) {
     fmt(w);
 }
 
 
-template<typename WriterMod, std::enable_if_t<is_free_writer_mod<WriterMod>{}, int> = 0>
-auto begin(WriterMod &&mod) {
-    class hook_impl: public writer_mod_hook, public std::decay_t<WriterMod> {
+template<typename FormatMod, std::enable_if_t<is_free_format_mod<FormatMod>{}, int> = 0>
+auto
+begin(FormatMod &&mod) {
+    class hook_impl: public format_mod_hook, public std::decay_t<FormatMod> {
         public:
-            hook_impl(WriterMod &&mod)
-                : WriterMod(std::forward<WriterMod>(mod)) {
+            hook_impl(FormatMod &&mod)
+                : FormatMod(std::forward<FormatMod>(mod)) {
             }
     };
-    return hook_impl(std::forward<WriterMod>(mod));
+    return hook_impl(std::forward<FormatMod>(mod));
 }
 
 
 class end_t {} extern end;
 
-template<typename WriterModHook, std::enable_if_t<is_writer_mod_hook<WriterModHook>{}, int> = 0>
-decltype(auto) operator<<(WriterModHook &&w, end_t) {
+template<typename WriterModHook, std::enable_if_t<is_format_mod_hook<WriterModHook>{}, int> = 0>
+decltype(auto)
+operator<<(WriterModHook &&w, end_t) {
     return w.parent();
 }
 
 
 class nl_t {} extern nl;
 
-template<typename Writer>
-void write(Writer &w, nl_t) {
+template<typename Writeable>
+void
+write(Writeable &w, nl_t) {
     switch (w.line_ending()) {
         case line_ending::cr: write(w, "\r"); break;
         case line_ending::lf: write(w, "\n"); break;
@@ -226,25 +264,39 @@ void write(Writer &w, nl_t) {
 
 class flush_t {} extern flush;
 
-template<typename BufferedWriter,
-        std::enable_if_t<is_buffered_writer<BufferedWriter>{}, int> = 0>
-void write(BufferedWriter &w, flush_t) {
+template<typename BufferedWriteable,
+        std::enable_if_t<is_buffered_writeable<BufferedWriteable>{}, int> = 0>
+void
+write(BufferedWriteable &w, flush_t) {
     w.flush();
 }
 
 
 
-template<typename Writer, std::size_t N>
-void write(Writer &w, const char (&literal)[N]) {
+template<typename Writeable, std::size_t N>
+void
+write(Writeable &w, const char (&literal)[N]) {
     w.write(literal, N-1);
 }
 
 
-template<typename Writer>
-void write(Writer &w, int v);
+template<typename Number, std::enable_if_t<std::is_arithmetic<Number>{}
+        || std::is_same<Number, bool>{} || std::is_same<Number, const void*>{}, int> = 0>
+void
+write(writeable &w, const Number &v, format_flags flags = format_flags{}, unsigned precision = 6);
 
 
-class string_writer: public writer {
+template<typename Number, std::enable_if_t<std::is_arithmetic<Number>{}
+        || std::is_same<Number, bool>{} || std::is_same<Number, const void*>{}, int> = 0>
+auto
+format(const Number &v, format_flags flags, unsigned precision = 6) {
+    return make_formatter([=](auto &w) {
+        write(w, v, flags, precision);
+    });
+}
+
+
+class string_writer final: public writer, public buffered {
 public:
     string_writer(std::string &str)
         : m_string(&str) {
@@ -254,7 +306,7 @@ public:
         try { flush(); } catch(...) {}
     }
 
-    void write(const char *seq, std::size_t n) {
+    virtual void write(const char *seq, std::size_t n) override {
         if (spos + n > sz) {
             flush();
         }
@@ -281,8 +333,8 @@ private:
 };
 
 
-template<typename Writer>
-void write(Writer &w, const std::string &str) {
+template<typename Writeable>
+void write(Writeable &w, const std::string &str) {
     w.write(str.c_str(), str.length());
 }
 
@@ -297,4 +349,4 @@ auto operator<<(std::string &str, T &&chain) {
 } // namespace ops
 
 
-} // namespace fio
+} // namespace sio

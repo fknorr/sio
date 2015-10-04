@@ -9,20 +9,20 @@ using stclk = std::chrono::steady_clock;
 
 [[gnu::noinline]] void first() {
     std::string str;
-    fio::string_writer sw(str);
+    sio::string_writer sw(str);
 
     for (std::size_t i = 0; i < 1000000; ++i) {
-        sw << int(i) << " ";
+        sw << sio::format(i, sio::format_flags::hex | sio::format_flags::show_base) << " ";
     }
-    sw << fio::nl;
-    sw.flush();
+    sw << sio::nl << sio::flush;
     //std::cout << str;
 }
 
 [[gnu::noinline]] void second() {
     std::ostringstream oss;
+    oss.flags(std::ios_base::hex | std::ios_base::showbase);
     for (std::size_t i = 0; i < 1000000; ++i) {
-        oss << int(i) << " ";
+        oss << i << " ";
     }
     oss << "\n";
     //std::cout << oss.str();
