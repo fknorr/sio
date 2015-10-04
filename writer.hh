@@ -196,7 +196,7 @@ using is_free_format_mod = std::integral_constant<bool,
 template<typename Writeable, typename FormatMod,
         std::enable_if_t<is_writeable<Writeable>{} && is_format_mod<FormatMod>{}, int> = 0>
 auto
-operator<<(Writeable &w, const FormatMod &mod) {
+operator<<(Writeable &&w, const FormatMod &mod) {
     return mod.bind(w);
 }
 
@@ -296,13 +296,21 @@ format(const Number &v, format_flags flags, unsigned precision = 6) {
 }
 
 
-class string_writer final: public writer, public buffered {
+template<typename Ref>
+class basic_string_writer final: public writer, public buffered {
 public:
-    string_writer(std::string &str)
+    using ref_type = Ref;
+
+    basic_string_writer(Ref str)
         : m_string(&str) {
     }
 
-    ~string_writer() noexcept {
+    basic_string_writer(basic_string_writer &&other) {
+        other.flush();
+        m_string = other.m_string;
+    }
+
+    ~basic_string_writer() noexcept {
         try { flush(); } catch(...) {}
     }
 
@@ -325,6 +333,10 @@ public:
         }
     }
 
+    Ref string() const {
+        return std::forward<Ref>(*m_string);
+    }
+
 private:
     static constexpr std::size_t sz = 100;
     std::string *m_string;
@@ -332,18 +344,40 @@ private:
     std::size_t spos = 0;
 };
 
+using string_writer = basic_string_writer<std::string&>;
+using rvalue_string_writer = basic_string_writer<std::string&&>;
+
 
 template<typename Writeable>
-void write(Writeable &w, const std::string &str) {
+void
+write(Writeable &w, const std::string &str) {
     w.write(str.c_str(), str.length());
+}
+
+
+class ret_t {} extern ret;
+
+template<typename Writeable, std::enable_if_t<
+        std::is_same<std::decay_t<Writeable>, string_writer>{}
+        || std::is_same<std::decay_t<Writeable>, rvalue_string_writer>{}, int> = 0>
+auto
+operator<<(Writeable &&w, ret_t) {
+    return std::forward<typename Writeable::ref_type>(w.string());
 }
 
 
 namespace ops {
 
 template<typename T>
-auto operator<<(std::string &str, T &&chain) {
-    return string_writer(str) << std::forward<T>(chain);
+auto
+operator<<(std::string &str, T &&chain) {
+    return basic_string_writer<std::string&>(str) << std::forward<T>(chain);
+}
+
+template<typename T>
+auto
+operator<<(std::string &&str, T &&chain) {
+    return basic_string_writer<std::string&&>(std::move(str)) << std::forward<T>(chain);
 }
 
 } // namespace ops

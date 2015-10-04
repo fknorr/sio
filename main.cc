@@ -4,6 +4,8 @@
 #include <iostream>
 
 
+using namespace sio::ops;
+
 using stclk = std::chrono::steady_clock;
 
 
@@ -29,6 +31,11 @@ using stclk = std::chrono::steady_clock;
 }
 
 
+void foo(const std::string &s) {
+    std::cout << s << "\n";
+}
+
+
 int main(void) {
     auto now = stclk::now();
     first();
@@ -38,4 +45,7 @@ int main(void) {
     now = stclk::now();
     second();
     std::cout << std::chrono::duration_cast<std::chrono::microseconds>(stclk::now() - now).count() << "\n";
+
+
+    foo(std::string{} << 123 << sio::ret);
 }

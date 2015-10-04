@@ -8,6 +8,7 @@ using namespace sio;
 nl_t sio::nl;
 end_t sio::end;
 flush_t sio::flush;
+ret_t sio::ret;
 
 
 class dummy_ostreambuf final: public std::streambuf {
