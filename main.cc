@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iostream>
 #include "bitfield.hh"
+#include "compat.hh"
 
 
 using namespace sio::ops;
@@ -38,6 +39,13 @@ void foo(const std::string &s) {
 
 enum class flgs { foo, bar };
 
+struct s {};
+struct t {};
+
+std::ostream &operator<<(std::ostream &os, s) {
+    return os << "struct s";
+}
+
 
 int main(void) {
     auto now = stclk::now();
@@ -53,7 +61,9 @@ int main(void) {
     foo(std::string{} << 123 << " + " << sio::format(3.14159265, sio::fmt::show_sign)
             << sio::ret);
 
-    foo(std::string{} << (sio::fmt::oct | sio::fmt::fixed | sio::bitfield<sio::fmt>(2048)) << sio::ret);
+    foo(std::string{} << (sio::fmt::oct | sio::fmt::fixed | static_cast<sio::fmt>(2048)) << sio::ret);
 
     foo(std::string{} << sio::line_ending::cr << sio::ret);
+
+    foo(std::string{} << s{} << sio::ret);
 }

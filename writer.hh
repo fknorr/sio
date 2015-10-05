@@ -204,6 +204,48 @@ template<typename T>
 using is_buffered_writeable = std::integral_constant<bool, is_writeable<T>{} && is_buffered<T>{}>;
 
 
+template<typename Writeable, std::size_t N>
+void
+write(Writeable &w, const char (&literal)[N]) {
+    w.write(literal, N-1);
+}
+
+
+template<typename Writer, typename Value>
+struct write_function_defined {
+private:
+    template<typename W, typename V>
+    static std::true_type test(
+            std::decay_t<decltype(write(std::declval<W&>(), std::declval<V>()))> *);
+
+    template<typename W, typename V>
+    static std::false_type test(...);
+
+public:
+    enum : bool { value = decltype(test<Writer, Value>(nullptr))::value };
+
+    constexpr write_function_defined() noexcept {}
+    constexpr operator bool() noexcept { return value; }
+    constexpr bool operator()() noexcept { return value; }
+};
+
+template<typename Writer, typename Value,
+        std::enable_if_t<write_function_defined<Writer, Value>{}, int> = 0>
+void
+dispatch_write(Writer &w, Value &&v) {
+    write(w, std::forward<Value>(v));
+}
+
+
+template<typename Writer>
+void
+dispatch_write(Writer &&, ...) {
+    static_assert(!sizeof(Writer), "Right-hand-side type must either have sio::write(Writer&, Rhs) "
+            "or operator<<(std::ostream&, Rhs) defined (with sio/compat.hh included for the "
+            "second option)");
+}
+
+
 class format_mod {};
 
 template<typename T>
@@ -231,8 +273,8 @@ operator<<(Writeable &&w, const FormatMod &mod) {
 template<typename FormatMod, typename Next,
         std::enable_if_t<is_free_format_mod<FormatMod>{}, int> = 0>
 decltype(auto)
-operator<<(const FormatMod &w, const Next &next) {
-    write(w, next);
+operator<<(FormatMod &&w, Next &&next) {
+    dispatch_write(static_cast<FormatMod&>(w), std::forward<Next>(next));
     return w.base();
 }
 
@@ -240,8 +282,8 @@ operator<<(const FormatMod &w, const Next &next) {
 template<typename Writeable, typename Next,
         std::enable_if_t<is_writeable<Writeable>{} && !is_free_format_mod<Writeable>{}, int> = 0>
 decltype(auto)
-operator<<(Writeable &&w, const Next &next) {
-    write(w, next);
+operator<<(Writeable &&w, Next &&next) {
+    dispatch_write(static_cast<Writeable&>(w), std::forward<Next>(next));
     return std::forward<Writeable>(w);
 }
 
@@ -296,14 +338,6 @@ template<typename BufferedWriteable,
 void
 write(BufferedWriteable &w, flush_t) {
     w.flush();
-}
-
-
-
-template<typename Writeable, std::size_t N>
-void
-write(Writeable &w, const char (&literal)[N]) {
-    w.write(literal, N-1);
 }
 
 
@@ -397,9 +431,9 @@ operator<<(Writeable &&w, ret_t) {
 template<typename Writer, typename Enum,
          std::enable_if_t<std::is_enum<Enum>{}, int> = 0>
 void
-write(Writer &&w, Enum value) {
+write(Writer &w, Enum value) {
     auto map = enum_names<Enum>{}();
-    write(std::forward<Writer>(w), map.first);
+    write(w, map.first);
 
     const char *name = nullptr;
     for (auto &pair : map.second) {
@@ -409,11 +443,11 @@ write(Writer &&w, Enum value) {
         }
     }
     if (name) {
-        write(std::forward<Writer>(w), name);
+        write(w, name);
     } else {
-        write(std::forward<Writer>(w), "<");
-        write(std::forward<Writer>(w), static_cast<std::underlying_type_t<Enum>>(value));
-        write(std::forward<Writer>(w), ">");
+        write(w, "<");
+        write(w, static_cast<std::underlying_type_t<Enum>>(value));
+        write(w, ">");
     }
 }
 
