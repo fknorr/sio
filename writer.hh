@@ -4,7 +4,7 @@
 #include <utility>
 #include <memory>
 #include <string>
-#include <initializer_list>
+#include "enum.hh"
 #include "bitfield.hh"
 
 
@@ -46,16 +46,6 @@ constexpr auto make_formatter(Implementation &&impl)
     return formatter_impl(std::forward<Implementation>(impl));
 };
 
-
-template<typename Enum>
-using enum_name_list = std::pair<const char*, std::initializer_list<std::pair<Enum, const char*>>>;
-
-template<typename Enum>
-struct enum_names {
-    enum_name_list<Enum> operator()() const {
-        return { "enum", {} };
-    }
-};
 
 
 enum class fmt {
