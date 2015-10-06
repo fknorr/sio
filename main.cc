@@ -76,4 +76,5 @@ int main(void) {
     ms+.write(a, 5);*/
 
     sio::out << "foo" << sio::nl;
+    sio::debug << "debug" << sio::nl;
 }

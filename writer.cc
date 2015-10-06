@@ -10,6 +10,8 @@ end_t sio::end;
 flush_t sio::flush;
 ret_t sio::ret;
 
+discarding_writer sio::nirvana;
+
 
 writeable::ios_cache::ref_set::~ref_set() {}
 

@@ -355,6 +355,14 @@ format(const Number &v, bitfield<fmt> flags, unsigned precision = 6) {
 }
 
 
+class discarding_writer final: public writer {
+public:
+    virtual void write(const char *, std::size_t) override {}
+};
+
+extern discarding_writer nirvana;
+
+
 template<typename Ref>
 class basic_string_writer final: public writer, public buffered {
 public:
