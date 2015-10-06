@@ -85,4 +85,8 @@ int main(void) {
     sio::string_writer sw;
     sw << "1/45 = " << (1./45);
     sio::out << sw.str() << sio::nl;
+
+    sio::out << sio::format("f{}rmat\n", 0);
+    sio::printf("pr{0}ntf{0}", 1, 2);
+    sio::out << sio::nl;
 }

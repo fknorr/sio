@@ -501,6 +501,70 @@ private:
 };
 
 
+template<std::size_t Index = 0, typename Writeable = void, typename Tuple = void,
+         std::enable_if_t<Index < std::tuple_size<Tuple>{}, int> = 0>
+void dispatch_write_tuple_element(Writeable &writer, const Tuple &args, std::size_t i) {
+    if (Index == i) {
+        dispatch_write(writer, std::get<Index>(args));
+    } else {
+        dispatch_write_tuple_element<Index+1>(writer, args, i);
+    }
+}
+
+
+template<std::size_t Index = 0, typename Writeable = void, typename Tuple = void,
+         std::enable_if_t<Index >= std::tuple_size<Tuple>{}, int> = 0>
+void dispatch_write_tuple_element(Writeable &w, const Tuple &, std::size_t) {
+    write(w, "??");
+}
+
+
+template<typename CharSequence, typename Writer, typename ArgTuple>
+void
+write_formatted(Writer &w, const CharSequence &fmt, const ArgTuple args) {
+    std::size_t next_arg = 0;
+    const char *begin = &fmt[0], *start = begin, *it = start;
+    for (;;) {
+        if ((!*it || *it == '{') && start != it) {
+            w.write(start, it-start);
+        }
+        if (*it == '{') {
+            ++it;
+            if (!*it || *it == '{') {
+                write(w, "{");
+            } else {
+                if (*it >= '0' && *it <= '9') {
+                    next_arg = static_cast<std::size_t>(*it - '0');
+                    while (++it, *it >= '0' && *it <= '9') {
+                        next_arg = next_arg * 10 + static_cast<std::size_t>(*it - '0');
+                    }
+                }
+                if (*it == '}') {
+                    dispatch_write_tuple_element<0>(w, args, next_arg++);
+                } else {
+                    write(w, "??");
+                }
+                ++it;
+                start = it;
+            }
+        } else if (*it) {
+            ++it;
+        } else {
+            break;
+        }
+    }
+}
+
+
+template<typename ...Params>
+auto
+format(const std::string &fmt, const Params &...arg_list) {
+    auto args = std::make_tuple(arg_list...);
+    return make_formatter([=](auto &w) {
+        write_formatted(w, fmt, args);
+    });
+}
+
 
 namespace ops {
 
