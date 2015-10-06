@@ -348,7 +348,7 @@ write(writeable &w, const Number &v, bitfield<fmt> flags = {}, unsigned precisio
 template<typename Number, std::enable_if_t<std::is_arithmetic<Number>{}
         || std::is_same<Number, bool>{} || std::is_same<Number, const void*>{}, int> = 0>
 auto
-format(const Number &v, bitfield<fmt> flags, unsigned precision = 6) {
+num(const Number &v, bitfield<fmt> flags, unsigned precision = 6) {
     return make_formatter([=](auto &w) {
         write(w, v, flags, precision);
     });
@@ -363,18 +363,33 @@ public:
 extern discarding_writer nirvana;
 
 
-template<typename Ref>
+template<typename Ref, typename Store>
 class basic_string_writer final: public writer, public buffered {
 public:
     using ref_type = Ref;
+    using store_type = Store;
 
-    basic_string_writer(Ref str)
+    template<typename U = Store, std::enable_if_t<!std::is_pointer<U>{}, int> = 0>
+    basic_string_writer() {}
+
+    template<typename U = Store, std::enable_if_t<std::is_pointer<U>{}, int> = 0>
+    explicit basic_string_writer(Ref str)
         : m_string(&str) {
+    }
+
+    template<typename U = Store, std::enable_if_t<!std::is_pointer<U>{}, int> = 0>
+    explicit basic_string_writer(Ref str)
+        : m_string(std::forward<Ref>(str)) {
+    }
+
+    basic_string_writer(const basic_string_writer &other) {
+        other.flush();
+        m_string = other.m_string;
     }
 
     basic_string_writer(basic_string_writer &&other) {
         other.flush();
-        m_string = other.m_string;
+        m_string = std::move(other.m_string);
     }
 
     ~basic_string_writer() noexcept {
@@ -386,34 +401,46 @@ public:
             flush();
         }
         if (n > sz) {
-            m_string->append(seq, seq+n);
+            str_ref().append(seq, seq+n);
         } else {
             std::copy(seq, seq+n, scratch+spos);
             spos += n;
         }
     }
 
-    void flush() {
+    void flush() const {
         if (spos) {
-            m_string->append(scratch, scratch+spos);
+            str_ref().append(scratch, scratch+spos);
             spos = 0;
         }
     }
 
-    Ref string() {
+    Ref str() const {
         flush();
-        return std::forward<Ref>(*m_string);
+        return static_cast<Ref>(str_ref());
     }
 
 private:
+    template<typename U = Store, std::enable_if_t<std::is_pointer<U>{}, int> = 0>
+    std::string &str_ref() const {
+        return *m_string;
+    }
+
+    template<typename U = Store, std::enable_if_t<!std::is_pointer<U>{}, int> = 0>
+    std::string &str_ref() const {
+        return static_cast<std::string&>(m_string);
+    }
+
     static constexpr std::size_t sz = 100;
-    std::string *m_string;
+    mutable Store m_string;
     char scratch[sz];
-    std::size_t spos = 0;
+    mutable std::size_t spos = 0;
 };
 
-using string_writer = basic_string_writer<std::string&>;
-using rvalue_string_writer = basic_string_writer<std::string&&>;
+
+using string_writer = basic_string_writer<const std::string&, std::string>;
+using ref_string_writer = basic_string_writer<std::string&, std::string*>;
+using rvalue_string_writer = basic_string_writer<std::string&&, std::string*>;
 
 
 template<typename Writeable>
@@ -426,11 +453,11 @@ write(Writeable &w, const std::string &str) {
 class ret_t {} extern ret;
 
 template<typename Writeable, std::enable_if_t<
-        std::is_same<std::decay_t<Writeable>, string_writer>{}
+        std::is_same<std::decay_t<Writeable>, ref_string_writer>{}
         || std::is_same<std::decay_t<Writeable>, rvalue_string_writer>{}, int> = 0>
 auto
 operator<<(Writeable &&w, ret_t) {
-    return std::forward<typename Writeable::ref_type>(w.string());
+    return std::forward<typename Writeable::ref_type>(w.str());
 }
 
 
@@ -480,13 +507,13 @@ namespace ops {
 template<typename T>
 auto
 operator<<(std::string &str, T &&chain) {
-    return basic_string_writer<std::string&>(str) << std::forward<T>(chain);
+    return ref_string_writer(str) << std::forward<T>(chain);
 }
 
 template<typename T>
 auto
 operator<<(std::string &&str, T &&chain) {
-    return basic_string_writer<std::string&&>(std::move(str)) << std::forward<T>(chain);
+    return rvalue_string_writer(std::move(str)) << std::forward<T>(chain);
 }
 
 } // namespace ops
