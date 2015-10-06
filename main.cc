@@ -68,12 +68,12 @@ int main(void) {
 
     foo(std::string{} << s{} << sio::ret);
 
-    /*sio::memory_stream ms;
+    sio::memory_stream ms;
     ms.seek(0, sio::seek::set);
     ms.tell();
     char a[5];
     ms.get(a, 5);
-    ms.put(a, 5);*/
+    ms.put(a, 5);
 
     sio::out << "foo" << sio::nl;
     sio::debug << "debug" << sio::nl;

@@ -124,6 +124,8 @@ public:
     }
 
     virtual std::size_t get(void *out, std::size_t bytes) override {
+        if (m_data.empty()) return 0;
+
         bytes = std::max(bytes, m_data.size() - static_cast<std::size_t>(m_pos));
         auto start = &m_data[0] + m_pos;
         std::copy(start, start + bytes,  static_cast<unsigned char*>(out));
@@ -143,7 +145,7 @@ public:
     }
 
 private:
-    std::size_t m_pos;
+    std::size_t m_pos = 0;
     std::vector<unsigned char> m_data;
 
     enum : stream_pos { max_pos = std::numeric_limits<std::size_t>::max() };
