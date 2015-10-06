@@ -23,6 +23,8 @@ namespace std {
 
     template<typename Char>
     struct char_traits;
+
+    size_t strlen(const char *str);
 }
 
 
@@ -99,6 +101,8 @@ public:
             using num_put_type = std::num_put<char, std::ostreambuf_iterator<char,
                     std::char_traits<char>>>;
 
+            ~ref_set();
+
             std::unique_ptr<std::ios_base> ios_base;
             std::unique_ptr<streambuf_type> streambuf;
             const std::locale *locale;
@@ -106,10 +110,10 @@ public:
         };
         std::unique_ptr<ref_set> m_refs;
 
+        void create_refs();
+
         ref_set &refs() {
-            if (!m_refs) {
-                m_refs = std::make_unique<ref_set>();
-            }
+            if (!m_refs) create_refs();
             return *m_refs;
         }
 
@@ -122,8 +126,8 @@ public:
             return r;
         }
 
-        static std::unique_ptr<std::ios_base> create_ios_base();
-        static std::unique_ptr<std::streambuf> create_streambuf();
+        void create_ios_base();
+        void create_streambuf();
 
         template<typename Facet>
         static const Facet &cached_facet(Facet *&ptr, const std::locale &locale);
@@ -134,17 +138,13 @@ public:
 
         std::ios_base &ios_base() {
             auto &r = refs();
-            if (!r.ios_base) {
-                r.ios_base = create_ios_base();
-            }
+            if (!r.ios_base) create_ios_base();
             return *r.ios_base;
         }
 
         std::streambuf &streambuf() {
             auto &r = refs();
-            if (!r.streambuf) {
-                r.streambuf = create_streambuf();
-            }
+            if (!r.streambuf) create_streambuf();
             return *r.streambuf;
         }
     };
@@ -170,11 +170,11 @@ public:
     }
 
     writer() noexcept {}
-    writer(const writer &) = delete;
-    writer(writer &&rhs) = default;
+    writer(const writer &) {}
+    writer(writer &&) {}
 
-    writer &operator=(const writer&) = delete;
-    writer &operator=(writer &&) = default;
+    writer &operator=(const writer&) { return *this; }
+    writer &operator=(writer &&) { return *this; }
 
 private:
     mutable ios_cache m_ios;
@@ -198,6 +198,14 @@ template<typename Writeable, std::size_t N>
 void
 write(Writeable &w, const char (&literal)[N]) {
     w.write(literal, N-1);
+}
+
+
+template<typename Writeable, typename ConstIntPtr,
+        std::enable_if_t<std::is_same<const int*, std::remove_reference_t<ConstIntPtr>>{}, int> = 0>
+void
+write(Writeable& w, ConstIntPtr string) {
+    w.write(string, std::strlen(string));
 }
 
 
@@ -440,6 +448,23 @@ write(Writer &w, Enum value) {
         write(w, ">");
     }
 }
+
+
+template<typename OutStream>
+class stream_writer final: public writer {
+public:
+    stream_writer(OutStream &s)
+        : m_stream(&s) {
+    }
+
+    virtual void write(const char *seq, std::size_t n) override {
+        m_stream->put(seq, n);
+    }
+
+private:
+    OutStream *m_stream;
+};
+
 
 
 namespace ops {

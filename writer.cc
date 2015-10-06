@@ -11,6 +11,9 @@ flush_t sio::flush;
 ret_t sio::ret;
 
 
+writeable::ios_cache::ref_set::~ref_set() {}
+
+
 class dummy_ostreambuf final: public std::streambuf {
 public:
     void use(char *buffer, std::size_t size) {
@@ -18,7 +21,7 @@ public:
     }
 
     std::size_t pos() const {
-        return pptr() - pbase();
+        return static_cast<std::size_t>(pptr() - pbase());
     }
 };
 
@@ -26,14 +29,19 @@ public:
 class dummy_ios final: public std::ios_base {};
 
 
-std::unique_ptr<std::ios_base>
-writer::ios_cache::create_ios_base() {
-    return std::make_unique<dummy_ios>();
+void
+writer::ios_cache::create_refs() {
+    m_refs = std::make_unique<ref_set>();
 }
 
-std::unique_ptr<std::streambuf>
+void
+writer::ios_cache::create_ios_base() {
+    refs().ios_base = std::make_unique<dummy_ios>();
+}
+
+void
 writer::ios_cache::create_streambuf() {
-    return std::make_unique<dummy_ostreambuf>();
+    refs().streambuf = std::make_unique<dummy_ostreambuf>();
 }
 
 

@@ -4,7 +4,7 @@
 #include <iostream>
 #include "bitfield.hh"
 #include "compat.hh"
-#include "stream.hh"
+#include "stdio.hh"
 
 
 using namespace sio::ops;
@@ -68,10 +68,12 @@ int main(void) {
 
     foo(std::string{} << s{} << sio::ret);
 
-    sio::memory_stream ms;
+    /*sio::memory_stream ms;
     ms.seek(0, sio::seek::set);
     ms.pos();
     char a[5];
     ms.read(a, 5);
-    ms.write(a, 5);
+    ms+.write(a, 5);*/
+
+    sio::out << "foo" << sio::nl;
 }
