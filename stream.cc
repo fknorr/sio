@@ -31,42 +31,69 @@ file_stream::~file_stream() {
 
 
 std::size_t
-file_in_stream::get(void *out, std::size_t bytes) {
+file_in_stream::v_get(void *out, std::size_t bytes) {
     return static_cast<std::size_t>(streambuf().sgetn(
             static_cast<char*>(out), static_cast<std::streamsize>(bytes)));
 }
 
 
 std::size_t
-file_out_stream::put(const void *in, std::size_t bytes) {
+file_out_stream::v_put(const void *in, std::size_t bytes) {
     return static_cast<std::size_t>(streambuf().sputn(
             static_cast<const char*>(in), static_cast<std::streamsize>(bytes)));
 }
 
 
 void
-file_out_stream::flush() {
+file_out_stream::v_flush() {
     streambuf().pubsync();
 }
 
 
-stream_pos
-file_ra_stream::seek(stream_off offset, sio::seek rel) {
+static stream_pos
+seek_streambuf(std::streambuf &buf, stream_off off, sio::seek rel, std::ios::openmode which) {
     std::ios::seekdir dir;
     switch (rel) {
         case sio::seek::set: dir = std::ios::beg; break;
         case sio::seek::cur: dir = std::ios::cur; break;
         default: dir = std::ios::end;
     }
-    return static_cast<stream_pos>(streambuf().pubseekoff(static_cast<std::ios::off_type>(offset),
-            dir, std::ios::in | std::ios::out));
+    return static_cast<stream_pos>(buf.pubseekoff(static_cast<std::ios::off_type>(off),
+            dir, which));
+}
+
+static stream_pos
+tell_streambuf(const std::streambuf &buf, std::ios::openmode which) {
+    return static_cast<stream_pos>(const_cast<std::streambuf&>(buf).pubseekoff(0,
+            std::ios::cur, which));
+}
+
+stream_pos
+file_read_stream::v_seek_get(stream_off offset, sio::seek rel) {
+    return seek_streambuf(streambuf(), offset, rel, std::ios::in);
 }
 
 
 stream_pos
-file_ra_stream::tell() const {
-    return static_cast<stream_pos>(const_cast<streambuf_type&>(streambuf()).pubseekoff(
-            0, std::ios::cur, std::ios::in));
+file_read_stream::v_tell_get() const {
+    return tell_streambuf(streambuf(), std::ios::in);
+}
+
+stream_pos
+file_write_stream::v_seek_put(stream_off offset, sio::seek rel) {
+    return seek_streambuf(streambuf(), offset, rel, std::ios::out);
+}
+
+
+stream_pos
+file_write_stream::v_tell_put() const {
+    return tell_streambuf(streambuf(), std::ios::out);
+}
+
+
+stream_pos
+file_rw_stream::seek(stream_off offset, sio::seek rel) {
+    return seek_streambuf(streambuf(), offset, rel, std::ios::in | std::ios::out);
 }
 
 

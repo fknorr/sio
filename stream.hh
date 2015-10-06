@@ -47,44 +47,105 @@ public:
 stream::~stream() {}
 
 
-class ra_stream: public virtual stream {
-public:
-    virtual stream_pos seek(stream_off offset, sio::seek rel) = 0;
-
-    stream_pos seek(stream_pos new_pos) {
-        return seek(static_cast<stream_off>(new_pos), sio::seek::set);
-    }
-
-    virtual stream_pos tell() const = 0;
-};
-
-
 class in_stream: public virtual stream {
+protected:
+    virtual std::size_t v_get(void *out, std::size_t bytes) = 0;
+
 public:
-    virtual std::size_t get(void *out, std::size_t bytes) = 0;
+    std::size_t get(void *out, std::size_t bytes) {
+        return v_get(out, bytes);
+    }
 };
 
 
 class out_stream: public virtual stream {
-public:
-    virtual std::size_t put(const void *in, std::size_t bytes) = 0;
+protected:
+    virtual std::size_t v_put(const void *in, std::size_t bytes) = 0;
 
-    virtual void flush() {}
+    virtual void v_flush() {}
+
+public:
+    std::size_t put(const void *in, std::size_t bytes) {
+        return v_put(in, bytes);
+    }
+
+    void flush() {
+        v_flush();
+    }
 };
 
 
-class read_stream: public virtual ra_stream, public virtual in_stream {};
+class read_stream: public virtual in_stream {
+protected:
+    virtual stream_pos v_seek_get(stream_off offset, sio::seek rel) = 0;
 
-class write_stream: public virtual ra_stream, public virtual out_stream {};
+    virtual stream_pos v_tell_get() const = 0;
+
+public:
+    stream_pos seek_get(stream_off offset, sio::seek rel) {
+        return v_seek_get(offset, rel);
+    }
+
+    stream_pos seek_get(stream_pos new_pos) {
+        return v_seek_get(static_cast<stream_off>(new_pos), sio::seek::set);
+    }
+
+    stream_pos seek(stream_off offset, sio::seek rel) {
+        return v_seek_get(offset, rel);
+    }
+
+    stream_pos seek(stream_pos new_pos) {
+        return v_seek_get(static_cast<stream_off>(new_pos), sio::seek::set);
+    }
+
+    stream_pos tell_get() const {
+        return v_tell_get();
+    }
+
+    stream_pos tell() const {
+        return v_tell_get();
+    }
+};
+
+
+class write_stream: public virtual out_stream {
+protected:
+    virtual stream_pos v_seek_put(stream_off offset, sio::seek rel) = 0;
+
+    virtual stream_pos v_tell_put() const = 0;
+
+public:
+    stream_pos seek_put(stream_off offset, sio::seek rel) {
+        return v_seek_put(offset, rel);
+    }
+
+    stream_pos seek_put(stream_pos new_pos) {
+        return v_seek_put(static_cast<stream_off>(new_pos), sio::seek::set);
+    }
+
+    stream_pos seek(stream_off offset, sio::seek rel) {
+        return v_seek_put(offset, rel);
+    }
+
+    stream_pos seek(stream_pos new_pos) {
+        return v_seek_put(static_cast<stream_off>(new_pos), sio::seek::set);
+    }
+
+    stream_pos tell_put() const {
+        return v_tell_put();
+    }
+
+    stream_pos tell() const {
+        return v_tell_put();
+    }
+};
+
 
 class duplex_stream: public virtual in_stream, public virtual out_stream {};
 
 class rw_stream: public virtual read_stream, public virtual write_stream,
     public duplex_stream {};
 
-
-template<typename Stream>
-using is_ra_stream = std::is_base_of<ra_stream, std::decay_t<Stream>>;
 
 template<typename Stream>
 using is_in_stream = std::is_base_of<in_stream, std::decay_t<Stream>>;
@@ -106,24 +167,8 @@ using is_rw_stream = std::is_base_of<rw_stream, std::decay_t<Stream>>;
 
 
 class memory_stream final: public rw_stream {
-public:
-    virtual stream_pos seek(stream_off offset, sio::seek rel) override {
-        stream_off new_pos;
-        switch (rel) {
-            case sio::seek::set: new_pos = offset; break;
-            case sio::seek::cur: new_pos = static_cast<stream_off>(m_pos) + offset; break;
-            case sio::seek::end: new_pos = static_cast<stream_off>(m_data.size()) - offset; break;
-        }
-        if (new_pos < 0) new_pos = 0;
-        if (new_pos > static_cast<stream_off>(max_pos)) new_pos = static_cast<stream_off>(max_pos);
-        return m_pos;
-    }
-
-    virtual stream_pos tell() const override {
-        return m_pos;
-    }
-
-    virtual std::size_t get(void *out, std::size_t bytes) override {
+protected:
+    virtual std::size_t v_get(void *out, std::size_t bytes) override {
         if (m_data.empty()) return 0;
 
         bytes = std::max(bytes, m_data.size() - static_cast<std::size_t>(m_pos));
@@ -132,7 +177,7 @@ public:
         return bytes;
     }
 
-    virtual std::size_t put(const void *in, std::size_t bytes) override {
+    virtual std::size_t v_put(const void *in, std::size_t bytes) override {
         if (static_cast<stream_pos>(m_pos) + bytes > max_pos) {
             bytes = static_cast<std::size_t>(max_pos) - m_pos;
         }
@@ -144,7 +189,43 @@ public:
         return bytes;
     }
 
+    virtual stream_pos v_seek_get(stream_off offset, sio::seek rel) override {
+        return seek_both(offset, rel);
+    }
+
+    virtual stream_pos v_tell_get() const override {
+        return tell_both();
+    }
+
+    virtual stream_pos v_seek_put(stream_off offset, sio::seek rel) override {
+        return seek_both(offset, rel);
+    }
+
+    virtual stream_pos v_tell_put() const override {
+        return tell_both();
+    }
+
+public:
+    using write_stream::seek;
+    using write_stream::tell;
+
 private:
+    stream_pos seek_both(stream_off offset, sio::seek rel) {
+        stream_off new_pos;
+        switch (rel) {
+            case sio::seek::set: new_pos = offset; break;
+            case sio::seek::cur: new_pos = static_cast<stream_off>(m_pos) + offset; break;
+            case sio::seek::end: new_pos = static_cast<stream_off>(m_data.size()) - offset; break;
+        }
+        if (new_pos < 0) new_pos = 0;
+        if (new_pos > static_cast<stream_off>(max_pos)) new_pos = static_cast<stream_off>(max_pos);
+        return m_pos;
+    }
+
+    stream_pos tell_both() const {
+        return m_pos;
+    }
+
     std::size_t m_pos = 0;
     std::vector<unsigned char> m_data;
 
@@ -207,7 +288,8 @@ public:
         : file_stream(fname, allow_get) {
     }
 
-    virtual std::size_t get(void *out, std::size_t bytes) final override;
+protected:
+    virtual std::size_t v_get(void *out, std::size_t bytes) final override;
 };
 
 
@@ -221,26 +303,12 @@ public:
         : file_stream(fname, allow_put, mode) {
     }
 
-    virtual std::size_t put(const void *in, std::size_t bytes) final override;
+protected:
+    virtual std::size_t v_put(const void *in, std::size_t bytes) final override;
 
-    virtual void flush() override;
+    virtual void v_flush() final override;
 };
 
-
-class file_ra_stream: public virtual file_stream, public virtual ra_stream {
-public:
-    explicit file_ra_stream(streambuf_type &buf)
-        : file_stream(buf) {
-    }
-
-    virtual inline ~file_ra_stream() = 0;
-
-    virtual stream_pos seek(stream_off offset, sio::seek rel) final override;
-
-    virtual stream_pos tell() const final override;
-};
-
-file_ra_stream::~file_ra_stream() {}
 
 
 class file_duplex_stream: public virtual file_in_stream, public virtual file_out_stream {
@@ -256,46 +324,58 @@ public:
 };
 
 
-class file_read_stream: public virtual file_in_stream, public virtual file_ra_stream,
-        public virtual read_stream {
+class file_read_stream: public virtual file_in_stream, public virtual read_stream {
 public:
     explicit file_read_stream(streambuf_type &buf)
-        : file_stream(buf), file_in_stream(buf), file_ra_stream(buf) {
+        : file_stream(buf), file_in_stream(buf) {
     }
 
     explicit file_read_stream(const std::string &fname)
-        : file_stream(fname, allow_get), file_in_stream(streambuf()),
-          file_ra_stream(streambuf()) {
+        : file_stream(fname, allow_get), file_in_stream(streambuf())  {
     }
+
+protected:
+    virtual stream_pos v_seek_get(stream_off offset, sio::seek rel) final override;
+
+    virtual stream_pos v_tell_get() const final override;
 };
 
 
-class file_write_stream: public virtual file_out_stream, public virtual file_ra_stream,
-        public virtual read_stream {
+class file_write_stream: public virtual file_out_stream, public virtual write_stream {
 public:
     explicit file_write_stream(streambuf_type &buf)
-        : file_stream(buf), file_out_stream(buf), file_ra_stream(buf) {
+        : file_stream(buf), file_out_stream(buf) {
     }
 
     explicit file_write_stream(const std::string &fname, open_mode mode = open_mode::truncate)
-        : file_stream(fname, allow_put, mode), file_out_stream(streambuf()),
-          file_ra_stream(streambuf()) {
+        : file_stream(fname, allow_put, mode), file_out_stream(streambuf())  {
     }
+
+protected:
+    virtual stream_pos v_seek_put(stream_off offset, sio::seek rel) final override;
+
+    virtual stream_pos v_tell_put() const final override;
 };
 
 
-class file_rw_stream: public file_read_stream, public file_write_stream,
+class file_rw_stream final: public file_read_stream, public file_write_stream,
         public file_duplex_stream, public rw_stream {
 public:
     explicit file_rw_stream(streambuf_type &buf)
-        : file_stream(buf), file_in_stream(buf), file_ra_stream(buf), file_out_stream(buf),
+        : file_stream(buf), file_in_stream(buf), file_out_stream(buf),
           file_read_stream(buf), file_write_stream(buf), file_duplex_stream(buf) {
     }
 
     explicit file_rw_stream(const std::string &fname, open_mode mode = open_mode::truncate)
         : file_stream(fname, allow_get | allow_put, mode), file_in_stream(streambuf()),
-          file_ra_stream(streambuf()), file_out_stream(streambuf()), file_read_stream(streambuf()),
+          file_out_stream(streambuf()), file_read_stream(streambuf()),
           file_write_stream(streambuf()), file_duplex_stream(streambuf()) {
+    }
+
+    stream_pos seek(stream_off offset, sio::seek rel);
+
+    stream_pos seek(stream_pos new_pos) {
+        return seek(static_cast<stream_off>(new_pos), sio::seek::set);
     }
 };
 
