@@ -51,14 +51,20 @@ constexpr auto make_formatter(Implementation &&impl)
 
 
 enum class fmt {
-    oct         = 1 << 0,
-    hex         = 1 << 1,
-    sci         = 1 << 2,
-    fixed       = 1 << 3,
-    show_base   = 1 << 4,
-    show_point  = 1 << 5,
-    show_sign   = 1 << 6,
-    uppercase   = 1 << 7
+    oct             = 1 << 0,
+    hex             = 1 << 1,
+    sci             = 1 << 2,
+    fixed           = 1 << 3,
+    show_base       = 1 << 4,
+    show_point      = 1 << 5,
+    show_sign       = 1 << 6,
+    uppercase       = 1 << 7,
+    left            = 1 << 8,
+    right           = 1 << 9,
+    center          = 1 << 10,
+    base_mask       = oct | hex | uppercase,
+    float_mask      = sci | fixed | uppercase,
+    justify_mask    = left | right | center
 };
 
 template<>
@@ -70,7 +76,8 @@ struct enum_names<fmt> {
         return { "sio::fmt::", {
             { fmt::oct, "oct" }, { fmt::hex, "hex" }, { fmt::sci, "sci" }, { fmt::fixed, "fixed" },
             { fmt::show_base, "show_base" }, { fmt::show_point, "show_point" },
-            { fmt::show_sign, "show_sign" }, { fmt::uppercase, "uppercase" }
+            { fmt::show_sign, "show_sign" }, { fmt::uppercase, "uppercase" },
+            { fmt::left, "left" }, { fmt::right, "right" }, { fmt::center, "center" }
         } };
     }
 };
@@ -318,24 +325,32 @@ public:
     }
 
 protected:
-    virtual writeable::ios_cache &v_ios() const {
+    virtual writeable::ios_cache &v_ios() const override {
         return m_parent->ios();
     }
 
-    virtual const std::locale &v_locale() const {
+    virtual const std::locale &v_locale() const override {
         return m_parent->locale();
     }
 
-    virtual sio::line_ending v_line_ending() const noexcept {
+    virtual sio::line_ending v_line_ending() const noexcept override {
         return m_parent->line_ending();
     }
 
-    virtual void v_write(const char *seq, std::size_t n) {
+    virtual void v_write(const char *seq, std::size_t n) override {
         m_parent->write(seq, n);
     }
 
-    virtual bitfield<fmt> v_flags() const noexcept {
+    virtual bitfield<fmt> v_flags() const noexcept override {
         return m_parent->flags();
+    }
+
+    virtual unsigned v_width() const noexcept override {
+        return m_parent->width();
+    }
+
+    virtual unsigned v_precision() const noexcept override {
+        return m_parent->precision();
     }
 
 private:
@@ -675,9 +690,29 @@ void dispatch_write_tuple_element(Writeable &w, const Tuple &, std::size_t) {
 
 template<typename CharSequence, typename Writer, typename ArgTuple>
 void
-write_formatted(Writer &w, const CharSequence &fmt, const ArgTuple args) {
+write_formatted(Writer &w, const CharSequence &fmt_str, const ArgTuple args) {
+    class mutator final: public format_mod<Writer> {
+    public:
+        bitfield<fmt> new_flags {}, flag_mask {};
+        unsigned new_width, new_precision;
+        bool width_mask = false, precision_mask = false;
+
+    protected:
+        virtual bitfield<fmt> v_flags() const noexcept override {
+            return format_mod<Writer>::v_flags() & ~flag_mask | new_flags;
+        }
+
+        virtual unsigned v_width() const noexcept override {
+            return width_mask ? new_width : format_mod<Writer>::v_width();
+        }
+
+        virtual unsigned v_precision() const noexcept override {
+            return precision_mask ? new_precision : format_mod<Writer>::v_precision();
+        }
+    };
+
     std::size_t next_arg = 0;
-    const char *begin = &fmt[0], *start = begin, *it = start;
+    const char *begin = &fmt_str[0], *start = begin, *it = start;
     for (;;) {
         if ((!*it || *it == '{') && start != it) {
             w.write(start, it-start);
@@ -687,14 +722,58 @@ write_formatted(Writer &w, const CharSequence &fmt, const ArgTuple args) {
             if (!*it || *it == '{') {
                 write(w, "{");
             } else {
+                mutator mut;
+                mut.bind(w);
+
                 if (*it >= '0' && *it <= '9') {
                     next_arg = static_cast<std::size_t>(*it - '0');
                     while (++it, *it >= '0' && *it <= '9') {
                         next_arg = next_arg * 10 + static_cast<std::size_t>(*it - '0');
                     }
                 }
+
+                if (*it == '<' || *it == '|' || *it == '>') {
+                    mut.flag_mask |= fmt::justify_mask;
+                    mut.new_flags = mut.new_flags & ~fmt::justify_mask
+                            | (*it == '<' ? fmt::left : *it == '|' ? fmt::center : fmt::right);
+                    if (*it >= '0' && *it <= '9') {
+                        mut.width_mask = true;
+                        mut.new_width = *it - '0';
+                        while (++it, *it >= '0' && *it <= '9') {
+                            mut.new_width = mut.new_width * 10 + *it - '0';
+                        }
+                    }
+                }
+
+                bitfield<fmt> base {}, float_rep {};
+                bool set_base = false, set_float = false;
+                for (;;) {
+                    bool end = false;
+                    switch (*it) {
+                        case 'x': set_base = true; base = fmt::hex; break;
+                        case 'X': set_base = true; base = fmt::hex | fmt::uppercase; break;
+                        case 'o': set_base = true; base = fmt::oct; break;
+                        case 'd': set_base = true; base = {}; break;
+                        case 'g': set_float = true; float_rep = {}; break;
+                        case 'f': set_float = true; float_rep = fmt::fixed; break;
+                        case 'e': set_float = true; float_rep = fmt::sci; break;
+                        case 'E': set_float = true; float_rep = fmt::sci | fmt::uppercase; break;
+                        default: end = true;
+                    }
+                    if (end) break;
+                    ++it;
+                }
+                if (set_base) {
+                    mut.flag_mask |= fmt::base_mask;
+                    mut.new_flags = mut.new_flags & ~fmt::base_mask | base;
+                }
+                if (set_float) {
+                    mut.flag_mask |= fmt::float_mask;
+                    mut.new_flags = mut.new_flags & ~fmt::float_mask | float_rep;
+                }
+
                 if (*it == '}') {
-                    dispatch_write_tuple_element<0>(w, args, next_arg++);
+                    dispatch_write_tuple_element<0>(mut, args, next_arg++);
                 } else {
                     write(w, "??");
                 }

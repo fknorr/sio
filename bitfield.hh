@@ -42,19 +42,19 @@ public:
         return *this;
     }
 
-    constexpr bitfield operator|(bitfield rhs) noexcept {
+    constexpr bitfield operator|(bitfield rhs) const noexcept {
         return bitfield { bits | rhs.bits };
     }
 
-    constexpr bitfield operator&(bitfield rhs) noexcept {
+    constexpr bitfield operator&(bitfield rhs) const noexcept {
         return bitfield { bits & rhs.bits };
     }
 
-    constexpr bitfield operator^(bitfield rhs) noexcept {
+    constexpr bitfield operator^(bitfield rhs) const noexcept {
         return bitfield { bits ^ rhs.bits };
     }
 
-    constexpr bitfield operator~() noexcept {
+    constexpr bitfield operator~() const noexcept {
         return bitfield { ~bits };
     }
 
@@ -62,11 +62,11 @@ public:
         return !!bits;
     }
 
-    constexpr bool operator==(bitfield rhs) noexcept {
+    constexpr bool operator==(bitfield rhs) const noexcept {
         return bits == rhs.bits;
     }
 
-    constexpr bool operator!=(bitfield rhs) noexcept {
+    constexpr bool operator!=(bitfield rhs) const noexcept {
         return bits != rhs.bits;
     }
 };

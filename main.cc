@@ -98,4 +98,8 @@ int main(void) {
 
     h << " " << sio::hex << 0x42 << sio::nl;
     sio::out << h;
+
+    sio::printf("decimal {d}, octal {o}, hex {x}, HEX {X}\n", 789, 0123, 0x12abc, 0X14DEF);
+    sio::printf("shortest {g}, fixed {f}, sci {e}, SCI {E}, hexfloat {xe}, HEXFLOAT {XE}\n",
+        0.00000134, 1.2345, 1e+8, 1e+9, 0x1abcp0, 0x1.21334p0);
 }
