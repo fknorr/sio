@@ -1,4 +1,4 @@
-#include "stream.hh"
+#include <sio/stream/stream.hh>
 #include <fstream>
 #include <iostream>
 #include <memory>

@@ -1,10 +1,9 @@
 #pragma once
 
-#include "enum.hh"
 #include <cstdint>
 #include <vector>
 #include <limits>
-#include "enum.hh"
+#include "../enum.hh"
 #include <string>
 
 

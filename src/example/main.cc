@@ -1,10 +1,10 @@
-#include "writer.hh"
 #include <chrono>
 #include <sstream>
 #include <iostream>
-#include "bitfield.hh"
-#include "compat.hh"
-#include "stdio.hh"
+#include <sio/writer/writer.hh>
+#include <sio/bitfield.hh>
+#include <sio/writer/compat.hh>
+#include <sio/writer/stdio.hh>
 
 
 using namespace sio::ops;

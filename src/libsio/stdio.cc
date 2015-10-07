@@ -1,5 +1,5 @@
-#include "stream.hh"
-#include "writer.hh"
+#include <sio/stream/stream.hh>
+#include <sio/writer/writer.hh>
 
 
 namespace sio {

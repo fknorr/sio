@@ -4,8 +4,8 @@
 #include <utility>
 #include <memory>
 #include <string>
-#include "enum.hh"
-#include "bitfield.hh"
+#include "../enum.hh"
+#include "../bitfield.hh"
 
 
 namespace std {
