@@ -151,30 +151,49 @@ public:
 
     virtual ~writeable() {}
 
-    virtual ios_cache &ios() const = 0;
+protected:
+    virtual ios_cache &v_ios() const = 0;
 
-    virtual const std::locale &locale() const;
+    virtual const std::locale &v_locale() const;
 
-    virtual sio::line_ending line_ending() const noexcept {
+    virtual sio::line_ending v_line_ending() const noexcept {
         return sio::line_ending::lf;
     }
 
-    virtual void write(const char *seq, std::size_t n) = 0;
+    virtual void v_write(const char *seq, std::size_t n) = 0;
+
+public:
+    ios_cache &ios() const {
+        return v_ios();
+    }
+
+    const std::locale &locale() {
+        return v_locale();
+    }
+
+    sio::line_ending line_ending() const noexcept {
+        return v_line_ending();
+    }
+
+    void write(const char *seq, std::size_t n) {
+        v_write(seq, n);
+    }
 };
 
 
 class writer: public writeable {
 public:
-    virtual ios_cache &ios() const override {
-        return m_ios;
-    }
-
     writer() noexcept {}
     writer(const writer &) {}
     writer(writer &&) {}
 
     writer &operator=(const writer&) { return *this; }
     writer &operator=(writer &&) { return *this; }
+
+protected:
+    virtual ios_cache &v_ios() const override {
+        return m_ios;
+    }
 
 private:
     mutable ios_cache m_ios;
@@ -356,8 +375,8 @@ num(const Number &v, bitfield<fmt> flags, unsigned precision = 6) {
 
 
 class discarding_writer final: public writer {
-public:
-    virtual void write(const char *, std::size_t) override {}
+protected:
+    virtual void v_write(const char *, std::size_t) override {}
 };
 
 extern discarding_writer nirvana;
@@ -396,18 +415,6 @@ public:
         try { flush(); } catch(...) {}
     }
 
-    virtual void write(const char *seq, std::size_t n) override {
-        if (spos + n > sz) {
-            flush();
-        }
-        if (n > sz) {
-            str_ref().append(seq, seq+n);
-        } else {
-            std::copy(seq, seq+n, scratch+spos);
-            spos += n;
-        }
-    }
-
     void flush() const {
         if (spos) {
             str_ref().append(scratch, scratch+spos);
@@ -418,6 +425,19 @@ public:
     Ref str() const {
         flush();
         return static_cast<Ref>(str_ref());
+    }
+
+protected:
+    virtual void v_write(const char *seq, std::size_t n) override {
+        if (spos + n > sz) {
+            flush();
+        }
+        if (n > sz) {
+            str_ref().append(seq, seq+n);
+        } else {
+            std::copy(seq, seq+n, scratch+spos);
+            spos += n;
+        }
     }
 
 private:
@@ -492,7 +512,8 @@ public:
         : m_stream(&s) {
     }
 
-    virtual void write(const char *seq, std::size_t n) override {
+protected:
+    virtual void v_write(const char *seq, std::size_t n) override {
         m_stream->put(seq, n);
     }
 

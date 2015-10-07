@@ -75,7 +75,7 @@ writer::ios_cache::locale_facet<std::num_put<char>>(const std::locale &);
 
 
 const std::locale &
-writeable::locale() const {
+writeable::v_locale() const {
     return std::locale::classic();
 }
 
