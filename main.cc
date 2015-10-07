@@ -89,4 +89,7 @@ int main(void) {
     sio::out << sio::format("f{}rmat\n", 0);
     sio::printf("pr{0}ntf{0}", 1, 2);
     sio::out << sio::nl;
+
+    std::string str = sio::sprintf("sprin{}f", 7);
+    sio::out << str << sio::nl;
 }

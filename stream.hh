@@ -382,6 +382,7 @@ public:
 
 extern file_out_stream stdout_stream;
 extern file_out_stream stderr_stream;
+extern file_out_stream buffered_stderr_stream;
 extern file_in_stream stdin_stream;
 
 

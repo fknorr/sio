@@ -99,4 +99,5 @@ file_rw_stream::seek(stream_off offset, sio::seek rel) {
 
 file_out_stream sio::stdout_stream(*std::cout.rdbuf());
 file_out_stream sio::stderr_stream(*std::cerr.rdbuf());
+file_out_stream sio::buffered_stderr_stream(*std::clog.rdbuf());
 file_in_stream sio::stdin_stream(*std::cin.rdbuf());

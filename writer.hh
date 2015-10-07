@@ -566,6 +566,15 @@ format(const std::string &fmt, const Params &...arg_list) {
 }
 
 
+template<typename CharSequence, typename ...Params>
+std::string
+sprintf(const CharSequence fmt, Params &&...args) {
+    string_writer sw;
+    write_formatted(sw, fmt, std::make_tuple(args...));
+    return sw.str();
+}
+
+
 namespace ops {
 
 template<typename T>
