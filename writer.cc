@@ -159,3 +159,13 @@ template void sio::write(writeable &, const double &, bitfield<fmt>, unsigned);
 template void sio::write(writeable &, const long double &, bitfield<fmt>, unsigned);
 template void sio::write(writeable &, const void *const &, bitfield<fmt>, unsigned);
 template void sio::write(writeable &, const bool &, bitfield<fmt>, unsigned);
+
+
+add_flag_format_mod_tag<fmt::oct> sio::oct;
+add_flag_format_mod_tag<fmt::hex> sio::hex;
+add_flag_format_mod_tag<fmt::sci> sio::sci;
+add_flag_format_mod_tag<fmt::fixed> sio::fixed;
+add_flag_format_mod_tag<fmt::show_base> sio::show_base;
+add_flag_format_mod_tag<fmt::show_point> sio::show_point;
+add_flag_format_mod_tag<fmt::show_sign> sio::show_sign;
+add_flag_format_mod_tag<fmt::uppercase>sio:: uppercase;

@@ -92,4 +92,10 @@ int main(void) {
 
     std::string str = sio::sprintf("sprin{}f", 7);
     sio::out << str << sio::nl;
+
+    sio::out << sio::hex << sio::show_base << 0xabcde << " " << sio::hex << 0xffff << " "
+             << 1234 << sio::nl;
+
+    h << " " << sio::hex << 0x42 << sio::nl;
+    sio::out << h;
 }

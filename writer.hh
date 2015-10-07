@@ -162,6 +162,18 @@ protected:
 
     virtual void v_write(const char *seq, std::size_t n) = 0;
 
+    virtual bitfield<fmt> v_flags() const noexcept {
+        return {};
+    }
+
+    virtual unsigned v_width() const noexcept {
+        return 0;
+    }
+
+    virtual unsigned v_precision() const noexcept {
+        return 6;
+    }
+
 public:
     ios_cache &ios() const {
         return v_ios();
@@ -177,6 +189,18 @@ public:
 
     void write(const char *seq, std::size_t n) {
         v_write(seq, n);
+    }
+
+    bitfield<fmt> flags() const noexcept {
+        return v_flags();
+    }
+
+    unsigned width() const noexcept {
+        return v_width();
+    }
+
+    unsigned precision() const noexcept {
+        return v_precision();
     }
 };
 
@@ -263,10 +287,61 @@ dispatch_write(Writer &&, ...) {
 }
 
 
-class format_mod {};
+class format_mod_base {};
 
 template<typename T>
-using is_format_mod = std::is_base_of<format_mod, std::decay_t<T>>;
+using is_format_mod = std::is_base_of<format_mod_base, std::decay_t<T>>;
+
+
+template<typename Writeable>
+class format_mod: public writeable, public format_mod_base {
+public:
+    using parent_type = Writeable;
+
+    auto &bind(Writeable &w) {
+        m_parent = &w;
+        return *this;
+    }
+
+    Writeable &parent() noexcept {
+        return *m_parent;
+    }
+
+    template<typename W = Writeable, std::enable_if_t<is_format_mod<W>{}, int> = 0>
+    auto &base() noexcept {
+        return m_parent->base();
+    }
+
+    template<typename W = Writeable, std::enable_if_t<!is_format_mod<W>{}, int> = 0>
+    auto &base() noexcept {
+        return *m_parent;
+    }
+
+protected:
+    virtual writeable::ios_cache &v_ios() const {
+        return m_parent->ios();
+    }
+
+    virtual const std::locale &v_locale() const {
+        return m_parent->locale();
+    }
+
+    virtual sio::line_ending v_line_ending() const noexcept {
+        return m_parent->line_ending();
+    }
+
+    virtual void v_write(const char *seq, std::size_t n) {
+        m_parent->write(seq, n);
+    }
+
+    virtual bitfield<fmt> v_flags() const noexcept {
+        return m_parent->flags();
+    }
+
+private:
+    Writeable *m_parent;
+};
+
 
 class format_mod_hook {};
 
@@ -278,6 +353,11 @@ using is_free_format_mod = std::integral_constant<bool,
         is_format_mod<std::decay_t<T>>{} && !is_format_mod_hook<std::decay_t<T>>{}>;
 
 
+class format_mod_tag {};
+
+template<typename T>
+using is_format_mod_tag = std::is_base_of<format_mod_tag, std::decay_t<T>>;
+
 
 template<typename Writeable, typename FormatMod,
         std::enable_if_t<is_writeable<Writeable>{} && is_format_mod<FormatMod>{}, int> = 0>
@@ -288,7 +368,8 @@ operator<<(Writeable &&w, const FormatMod &mod) {
 
 
 template<typename FormatMod, typename Next,
-        std::enable_if_t<is_free_format_mod<FormatMod>{}, int> = 0>
+        std::enable_if_t<is_free_format_mod<FormatMod>{} && !is_format_mod<Next>{}
+            && !is_format_mod_tag<Next>{}, int> = 0>
 decltype(auto)
 operator<<(FormatMod &&w, Next &&next) {
     dispatch_write(static_cast<FormatMod&>(w), std::forward<Next>(next));
@@ -297,7 +378,8 @@ operator<<(FormatMod &&w, Next &&next) {
 
 
 template<typename Writeable, typename Next,
-        std::enable_if_t<is_writeable<Writeable>{} && !is_free_format_mod<Writeable>{}, int> = 0>
+        std::enable_if_t<is_writeable<Writeable>{} && !is_free_format_mod<Writeable>{}
+            && !is_format_mod<Next>{} && !is_format_mod_tag<Next>{}, int> = 0>
 decltype(auto)
 operator<<(Writeable &&w, Next &&next) {
     dispatch_write(static_cast<Writeable&>(w), std::forward<Next>(next));
@@ -335,6 +417,49 @@ operator<<(WriterModHook &&w, end_t) {
 }
 
 
+template<typename Writeable, typename FormatModTag,
+         std::enable_if_t<is_writeable<Writeable>{} && !is_format_mod<FormatModTag>{}
+            && is_format_mod_tag<FormatModTag>{}, int> = 0>
+auto
+operator<<(Writeable &&w, FormatModTag &&tag) {
+    auto mod = tag.template create<Writeable>();
+    mod.bind(w);
+    return mod;
+}
+
+
+template<typename Writeable, fmt Flags>
+class add_flag_format_mod: public format_mod<Writeable> {
+public:
+    auto &bind(Writeable &w) noexcept {
+        format_mod<Writeable>::bind(w);
+        return *this;
+    }
+
+protected:
+    virtual bitfield<fmt> v_flags() const noexcept override {
+        return format_mod<Writeable>::v_flags() | Flags;
+    }
+};
+
+template<fmt Flags>
+struct add_flag_format_mod_tag: public format_mod_tag {
+    template<typename Writeable>
+    constexpr auto create() const {
+        return add_flag_format_mod<std::decay_t<Writeable>, Flags>{};
+    }
+};
+
+extern add_flag_format_mod_tag<fmt::oct> oct;
+extern add_flag_format_mod_tag<fmt::hex> hex;
+extern add_flag_format_mod_tag<fmt::sci> sci;
+extern add_flag_format_mod_tag<fmt::fixed> fixed;
+extern add_flag_format_mod_tag<fmt::show_base> show_base;
+extern add_flag_format_mod_tag<fmt::show_point> show_point;
+extern add_flag_format_mod_tag<fmt::show_sign> show_sign;
+extern add_flag_format_mod_tag<fmt::uppercase> uppercase;
+
+
 class nl_t {} extern nl;
 
 template<typename Writeable>
@@ -361,7 +486,15 @@ write(BufferedWriteable &w, flush_t) {
 template<typename Number, std::enable_if_t<std::is_arithmetic<Number>{}
         || std::is_same<Number, bool>{} || std::is_same<Number, const void*>{}, int> = 0>
 void
-write(writeable &w, const Number &v, bitfield<fmt> flags = {}, unsigned precision = 6);
+write(writeable &w, const Number &v, bitfield<fmt> flags, unsigned precision);
+
+
+template<typename Writeable, typename Number, std::enable_if_t<std::is_arithmetic<Number>{}
+        || std::is_same<Number, bool>{} || std::is_same<Number, const void*>{}, int> = 0>
+void
+write(Writeable &w, const Number &v) {
+    write(w, v, w.flags(), w.precision());
+}
 
 
 template<typename Number, std::enable_if_t<std::is_arithmetic<Number>{}
