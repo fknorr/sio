@@ -22,3 +22,5 @@ missing
 src/Makefile.in
 src/example/Makefile.in
 src/libsio/Makefile.in
+src/test/Makefile.in
+release/

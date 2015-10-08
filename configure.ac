@@ -25,6 +25,27 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_PROG_CXX
 AX_CXX_COMPILE_STDCXX_14([], [mandatory])
 
+AC_ARG_WITH([unit-tests],
+AS_HELP_STRING([--with-unit-tests],
+               [Compile with unit tests if Boost::Unit_Test_Framework is available]),
+    [
+    if test "$withval" = "no"; then
+		with_unit_tests="no"
+    elif test "$withval" = "yes"; then
+        with_unit_tests="yes"
+    else
+	    with_unit_tests="no"
+	fi
+    ],
+    [with_unit_tests="no"]
+)
+
+if test "x$with_unit_tests" == "xyes"; then
+    AX_BOOST_BASE
+    AX_BOOST_UNIT_TEST_FRAMEWORK
+fi
+AM_CONDITIONAL(UNIT_TESTS, test "x$with_unit_tests" == "xyes")
+
 AC_DEFINE_UNQUOTED([PREFIX], ["$prefix"], [Installation Prefix])
 AC_DEFINE_UNQUOTED([SOURCE_DIR], ["$srcdir"], [Absolute Source Directory])
 
@@ -40,4 +61,5 @@ Makefile
 src/Makefile
 src/libsio/Makefile
 src/example/Makefile
+src/test/Makefile
 ])

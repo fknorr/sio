@@ -16,6 +16,17 @@
 # along with libsio.  If not, see <http://www.gnu.org/licenses/>.
 
 
-ACLOCAL_AMFLAGS = -I m4
+check_PROGRAMS = $(top_builddir)/test
 
-SUBDIRS = src
+__top_builddir__test_SOURCES = \
+    main.cc \
+    writer.cc
+
+__top_builddir__test_LDADD = \
+    $(top_builddir)/libsio.la \
+    $(BOOST_LDFLAGS) \
+    $(BOOST_UNIT_TEST_FRAMEWORK_LIB)
+
+__top_builddir__test_CPPFLAGS = \
+    -I$(top_srcdir)/include\
+    $(BOOST_CFLAGS)

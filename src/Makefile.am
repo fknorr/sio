@@ -16,4 +16,8 @@
 # along with libsio.  If not, see <http://www.gnu.org/licenses/>.
 
 
-SUBDIRS = example libsio
+SUBDIRS = libsio example
+
+if UNIT_TESTS
+SUBDIRS += test
+endif

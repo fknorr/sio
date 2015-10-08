@@ -4,11 +4,13 @@
 #include <utility>
 #include <memory>
 #include <string>
+#include <cstring>
 #include "../enum.hh"
 #include "../bitfield.hh"
 
 
 namespace std {
+
     template<typename Char, typename Traits>
     class basic_streambuf;
 
@@ -24,7 +26,6 @@ namespace std {
     template<typename Char>
     struct char_traits;
 
-    size_t strlen(const char *str);
 }
 
 
