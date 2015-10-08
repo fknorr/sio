@@ -1,7 +1,7 @@
 #pragma once
 
 #include "writer.hh"
-#include "../stream/stream.hh"
+#include "../stream/file.hh"
 
 
 namespace sio {

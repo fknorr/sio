@@ -1,8 +1,8 @@
 #include <chrono>
 #include <sstream>
 #include <iostream>
-#include <sio/writer/writer.hh>
 #include <sio/bitfield.hh>
+#include <sio/stream/memory.hh>
 #include <sio/writer/compat.hh>
 #include <sio/writer/stdio.hh>
 

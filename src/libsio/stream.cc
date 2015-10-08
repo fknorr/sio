@@ -1,4 +1,5 @@
 #include <sio/stream/stream.hh>
+#include <sio/stream/file.hh>
 #include <fstream>
 #include <iostream>
 #include <memory>
