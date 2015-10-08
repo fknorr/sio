@@ -1,0 +1,2 @@
+sio is a small input/output library for C++14, built to work around design shortcomings in C++'s
+iostreams library.
